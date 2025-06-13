@@ -218,6 +218,8 @@
     <button onclick="generatePDF()">PDF exportieren</button>
   </div>
 
+<!-- alles identisch bis ... -->
+
 <script>
 let data = JSON.parse(localStorage.getItem('data') || '[]');
 let vehicles = JSON.parse(localStorage.getItem('vehicles') || '[]');
@@ -338,6 +340,7 @@ function addEntry() {
   checkNotifications();
 }
 
+// ✅ NEUE generatePDF-Funktion
 function generatePDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
@@ -346,23 +349,41 @@ function generatePDF() {
   doc.text("Prüftermine Übersicht", 14, 15);
   doc.text(`Erstellt am: ${today}`, 180, 15, { align: 'right' });
 
-  const selectedVehicle = vehicleSelect.value;
-  const filteredData = data.filter(entry => entry.vehicle === selectedVehicle);
-
-  const rows = filteredData.map(entry => [
-    entry.vehicle,
-    entry.date,
-    entry.type,
-    getStatus(entry).symbol
-  ]);
-
-  doc.autoTable({
-    head: [["Fahrzeug", "Datum", "Prüfart", "Status"]],
-    body: rows,
-    startY: 25
+  const sortedData = [...data].sort((a, b) => a.vehicle.localeCompare(b.vehicle));
+  const grouped = {};
+  sortedData.forEach(entry => {
+    if (!grouped[entry.vehicle]) grouped[entry.vehicle] = [];
+    grouped[entry.vehicle].push(entry);
   });
 
-  doc.save("prueftermine.pdf");
+  let currentY = 25;
+
+  for (const vehicle in grouped) {
+    doc.setFontSize(12);
+    doc.setTextColor(40);
+    doc.text(`Fahrzeug: ${vehicle}`, 14, currentY);
+    currentY += 6;
+
+    const rows = grouped[vehicle].map(entry => [
+      entry.date,
+      entry.type,
+      getStatus(entry).symbol
+    ]);
+
+    doc.autoTable({
+      head: [["Datum", "Prüfart", "Status"]],
+      body: rows,
+      startY: currentY,
+      theme: 'striped',
+      styles: { fontSize: 10 },
+      margin: { left: 14, right: 14 },
+      didDrawPage: function (data) {
+        currentY = data.cursor.y + 10;
+      }
+    });
+  }
+
+  doc.save("prueftermine_alle_fahrzeuge.pdf");
 }
 
 function checkNotifications() {
