@@ -3,406 +3,306 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Prüftermine Übersicht</title>
+  <title>Kfz-Manager Pro V7.4</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
   <style>
-    /* Grundlayout */
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      margin: 20px;
-      background: #f9fafd;
-      color: #333;
-      line-height: 1.5;
+    :root {
+      --primary: #2980b9; --secondary: #2c3e50; --success: #27ae60;
+      --warning: #f39c12; --danger: #e74c3c; --light: #f4f7f6;
+      --card-bg: #ffffff; --text: #333333; --border: #dddddd;
     }
+    @media (prefers-color-scheme: dark) {
+      :root { --light: #1a1a1a; --card-bg: #2c2c2c; --text: #e0e0e0; --border: #444444; }
+    }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; background: var(--light); color: var(--text); line-height: 1.5; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 15px; }
+    
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .tabs { display: flex; gap: 5px; margin-bottom: 20px; border-bottom: 2px solid var(--border); }
+    .tab { padding: 12px 18px; cursor: pointer; border-radius: 8px 8px 0 0; background: var(--border); border: none; color: var(--text); font-weight: bold; }
+    .tab.active { background: var(--primary); color: white; }
 
-    h1, h2 {
-      text-align: center;
-      color: #2c3e50;
-      margin-bottom: 0.5rem;
-    }
+    .card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
+    .grid-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; align-items: end; }
+    
+    input, select, button { padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; background: var(--card-bg); color: var(--text); width: 100%; box-sizing: border-box; }
+    button { background: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; }
+    button:hover { opacity: 0.9; }
 
-    label {
-      font-weight: 600;
-      margin-bottom: 0.3rem;
-      display: block;
-      color: #34495e;
-    }
+    .filter-section { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; background: var(--secondary); padding: 15px; border-radius: 10px; color: white; }
+    .filter-section select { width: auto; min-width: 250px; background: white; color: black; }
 
-    .input-group.column {
-      flex-direction: column;
-      align-items: stretch;
-      max-width: 220px;
-      margin: 0 auto 15px;
-    }
+    .vehicle-container { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 15px; overflow: hidden; background: var(--card-bg); }
+    .vehicle-header { background: var(--secondary); color: white; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
+    .header-overdue { background: var(--danger) !important; }
+    .header-warning { background: var(--warning) !important; color: black !important; }
 
-    select, input[type="text"], input[type="date"], button {
-      padding: 10px 14px;
-      font-size: 1rem;
-      border: 1.5px solid #bdc3c7;
-      border-radius: 6px;
-      outline-offset: 2px;
-      outline-color: transparent;
-      transition: outline-color 0.3s ease, border-color 0.3s ease;
-      min-width: 180px;
-      max-width: 180px;
-      box-sizing: border-box;
-    }
-    select:focus, input:focus {
-      outline-color: #2980b9;
-      border-color: #2980b9;
-    }
+    .term-row { display: grid; grid-template-columns: 2fr 2fr 1fr 1fr 1fr; gap: 10px; padding: 10px 15px; border-bottom: 1px solid var(--border); align-items: center; }
+    .term-row:last-child { border-bottom: none; }
 
-    button {
-      background-color: #2980b9;
-      color: white;
-      border: none;
-      cursor: pointer;
-      min-width: 120px;
-      font-weight: 600;
-      user-select: none;
-      box-shadow: 0 2px 5px rgb(41 128 185 / 0.4);
-      transition: background-color 0.3s ease;
-      border-radius: 6px;
-    }
-    button:hover, button:focus {
-      background-color: #1c5980;
-      outline: none;
-    }
-    button:active {
-      background-color: #154565;
-    }
+    .status-ok { color: var(--success); font-weight: bold; }
+    .status-warning { color: #d35400; font-weight: bold; }
+    .status-overdue { color: var(--danger); font-weight: bold; }
 
-    /* Button-Reihe */
-    .button-row {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-bottom: 20px;
-    }
+    #notifStatus { padding: 6px 15px; border-radius: 20px; transition: all 0.3s; font-size: 0.85rem; background: var(--border); border: 1px solid #999; }
+    #notifStatus.granted { background: var(--success); color: white; border-color: var(--success); }
+    #notifStatus.denied { background: var(--danger); color: white; border-color: var(--danger); }
 
-    /* Tabelle scrollbar und schöner */
-    #overview {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 10px rgb(0 0 0 / 0.1);
-      max-width: 100%;
-      display: block;
-      overflow-x: auto;
-      margin: 0 auto 30px;
-      background: white;
-    }
-    #overview thead tr {
-      background-color: #2980b9;
-      color: white;
-      font-weight: 700;
-      text-align: left;
-    }
-    #overview th, #overview td {
-      padding: 12px 15px;
-      white-space: nowrap;
-      border-bottom: 1px solid #eee;
-    }
-    #overview tbody tr:hover {
-      background-color: #ecf0f1;
-    }
-
-    /* Statusfarben */
-    .status-ok {
-      color: #27ae60;
-      font-weight: 700;
-      font-size: 1.2rem;
-      text-align: center;
-    }
-    .status-warning {
-      color: #f39c12;
-      font-weight: 700;
-      font-size: 1.2rem;
-      text-align: center;
-    }
-    .status-overdue {
-      color: #e74c3c;
-      font-weight: 700;
-      font-size: 1.2rem;
-      text-align: center;
-    }
-
-    /* Checkbox zentrieren */
-    td > input[type="checkbox"] {
-      width: 20px;
-      height: 20px;
-      cursor: pointer;
-      display: block;
-      margin: 0 auto;
-    }
-
-    /* Responsive Anpassungen */
-    @media (max-width: 600px) {
-      .input-group {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      select, input[type="text"], input[type="date"], button {
-        min-width: 100%;
-        max-width: 100%;
-      }
-      .button-row {
-        flex-direction: column;
-        gap: 10px;
-      }
-      #overview thead tr {
-        font-size: 0.9rem;
-      }
-      #overview tbody tr {
-        font-size: 0.9rem;
-      }
-    }
+    .hidden { display: none; }
+    .empty-state { text-align: center; padding: 40px; color: #888; border: 2px dashed var(--border); border-radius: 10px; }
   </style>
 </head>
 <body>
-  <h1>Prüftermine Übersicht</h1>
 
-  <div class="input-group column">
-    <label for="newVehicle">Kennzeichen eingeben</label>
-    <input type="text" id="newVehicle" placeholder="Kennzeichen eingeben" />
+<div class="container">
+  <header>
+    <h1>🚛 Kfz-Manager Pro V7.4</h1>
+    <div id="notifStatus" style="cursor: pointer;" onclick="requestNotifications()">🔔 Alarm prüfen...</div>
+  </header>
+  
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('planer')">📋 Planer</button>
+    <button class="tab" onclick="showTab('archive')">📂 Archiv</button>
+    <button class="tab" onclick="showTab('settings')">⚙️ Optionen</button>
   </div>
 
-  <div class="button-row"><br>
-    <button onclick="addVehicle()">Hinzufügen</button>
-    <select id="vehicleSelect" onchange="refreshTable()">
-      <option disabled selected>Fahrzeug auswählen</option>
-    </select>
-    <button onclick="editVehicle()">Bearbeiten</button>
-    <button onclick="deleteVehicle()">Löschen</button>
+  <div id="tab-planer">
+    <div class="card">
+      <div class="grid-form">
+        <div><label>Fahrzeug-Stamm</label><input type="text" id="newVehicle" placeholder="Kennzeichen..." onkeyup="this.value = this.value.toUpperCase()"></div>
+        <button onclick="addVehicle()">Registrieren</button>
+        <div><label>Stamm-Verwaltung</label><select id="vehicleSelect" onchange="checkVehicleConflict()"></select></div>
+        <button onclick="deleteVehicle()" style="background:var(--danger)">Löschen</button>
+      </div>
+      <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--border);">
+      <div class="grid-form">
+        <div><label>Fällig am</label><input type="date" id="dateInput"></div>
+        <div><label>Prüfung</label><select id="typeSelect"></select></div>
+        <div><label>KM (optional)</label><input type="number" id="kmInput" placeholder="Stand"></div>
+        <button onclick="addEntry()" style="background:var(--success)">Termin speichern</button>
+      </div>
+    </div>
+
+    <div class="filter-section">
+      <label><strong>Anzeige filtern:</strong></label>
+      <select id="displayFilter" onchange="refreshTable()">
+        <option value="none">-- Kein Fahrzeug ausgewählt --</option>
+        <option value="all">Alle Fahrzeuge anzeigen</option>
+      </select>
+      <button onclick="generatePDF()" style="width:auto; margin-left:auto; background:var(--primary)">📄 PDF Druck</button>
+    </div>
+
+    <div id="vehicleDisplayList"></div>
   </div>
 
-  <div class="input-group column">
-    <label for="dateInput">Prüfdatum:</label>
-    <input type="date" id="dateInput" />
+  <div id="tab-archive" class="hidden">
+    <div class="card">
+      <h3>Abgeschlossene Prüfungen</h3>
+      <table style="width:100%; border-collapse: collapse;">
+        <thead style="background: var(--primary); color: white;">
+          <tr><th style="padding:10px;">Datum</th><th>Fahrzeug</th><th>Prüfung</th><th>KM</th></tr>
+        </thead>
+        <tbody id="archiveBody"></tbody>
+      </table>
+    </div>
   </div>
 
-  <div class="input-group column" style="max-width: 220px; margin: 0 auto 10px;">
-    <label for="typeSelect">Prüfart:</label>
-    <select id="typeSelect">
-      <option>TÜV</option>
-      <option>Eichamt</option>
-      <option>Prüfung Liege</option>
-      <option>Prüfung elektr. Rampe</option>
-    </select>
+  <div id="tab-settings" class="hidden">
+    <div class="card">
+      <h3>Datensicherung</h3>
+      <div class="grid-form">
+        <button onclick="exportData()" style="background:var(--secondary)">💾 Backup exportieren</button>
+        <button onclick="document.getElementById('importFile').click()" style="background:var(--primary)">📂 Backup importieren</button>
+        <input type="file" id="importFile" onchange="importData()" class="hidden">
+      </div>
+    </div>
+    
+    <div class="card">
+      <h3>Intervalle (Tage)</h3>
+      <div id="intervalSettings" class="grid-form"></div>
+      <button onclick="saveIntervals()" style="margin-top:15px; background:var(--success)">Intervalle speichern</button>
+    </div>
   </div>
-
-  <div style="margin-top: 10px; text-align: center;">
-    <button onclick="addEntry()">Prüftermin speichern</button>
-  </div>
-
-  <h2>Alle Prüftermine</h2>
-  <table id="overview">
-    <thead>
-    <tr>
-      <th>Fahrzeug</th>
-      <th>Datum</th>
-      <th>Prüfart</th>
-      <th>Status</th>
-      <th>Erledigt</th>
-    </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <br>
-  <div style="text-align: center;">
-    <button onclick="generatePDF()">PDF exportieren</button>
-  </div>
-
-<!-- alles identisch bis ... -->
+</div>
 
 <script>
-let data = JSON.parse(localStorage.getItem('data') || '[]');
-let vehicles = JSON.parse(localStorage.getItem('vehicles') || '[]');
-
-const vehicleSelect = document.getElementById('vehicleSelect');
-const dateInput = document.getElementById('dateInput');
-const typeSelect = document.getElementById('typeSelect');
-const newVehicleInput = document.getElementById('newVehicle');
-const tbody = document.querySelector('#overview tbody');
+let data = JSON.parse(localStorage.getItem('v74_data') || '[]');
+let vehicles = JSON.parse(localStorage.getItem('v74_vehicles') || '[]');
+let archive = JSON.parse(localStorage.getItem('v74_archive') || '[]');
+let intervals = JSON.parse(localStorage.getItem('v74_intervals') || JSON.stringify({
+  'TÜV': 365, 'Eichamt': 730, 'Tachoprüfung': 730, 'Prüfung Liege': 730, 'Rampe': 365
+}));
 
 function saveAll() {
-  localStorage.setItem('data', JSON.stringify(data));
-  localStorage.setItem('vehicles', JSON.stringify(vehicles));
+  localStorage.setItem('v74_data', JSON.stringify(data));
+  localStorage.setItem('v74_vehicles', JSON.stringify(vehicles));
+  localStorage.setItem('v74_archive', JSON.stringify(archive));
+  localStorage.setItem('v74_intervals', JSON.stringify(intervals));
+}
+
+function updateNotifVisuals() {
+  const el = document.getElementById('notifStatus');
+  if (Notification.permission === 'granted') {
+    el.innerText = '✅ Alarm Aktiv';
+    el.className = 'granted';
+  } else if (Notification.permission === 'denied') {
+    el.innerText = '⚠️ Blockiert (Anleitung?)';
+    el.className = 'denied';
+  } else {
+    el.innerText = '🔔 Alarm aktivieren';
+    el.className = '';
+  }
+}
+
+function requestNotifications() {
+  if (Notification.permission === 'denied') {
+    alert("Benachrichtigungen wurden blockiert.\n\nSo entsperren Sie sie:\n1. Klicken Sie auf das Schloss-Symbol neben der URL.\n2. Setzen Sie 'Benachrichtigungen' auf 'Zulassen'.\n3. Seite neu laden!");
+    return;
+  }
+  Notification.requestPermission().then(updateNotifVisuals);
+}
+
+function showTab(tabId) {
+  document.querySelectorAll('[id^="tab-"]').forEach(t => t.classList.add('hidden'));
+  document.getElementById('tab-' + tabId).classList.remove('hidden');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  if(tabId === 'archive') refreshArchive();
+  if(tabId === 'settings') renderIntervalSettings();
 }
 
 function refreshVehicleSelect() {
-  vehicleSelect.innerHTML = '<option disabled selected>Fahrzeug auswählen</option>';
-  vehicles.forEach(v => {
-    let opt = document.createElement('option');
-    opt.textContent = v;
-    vehicleSelect.appendChild(opt);
+  const sel = document.getElementById('vehicleSelect');
+  const dFilter = document.getElementById('displayFilter');
+  const oldVal = dFilter.value;
+  sel.innerHTML = '<option value="">-- Fahrzeug wählen --</option>';
+  dFilter.innerHTML = '<option value="none">-- Auswählen --</option><option value="all">Alle anzeigen</option>';
+  vehicles.sort().forEach(v => {
+    const opt = `<option value="${v}">${v}</option>`;
+    sel.innerHTML += opt;
+    dFilter.innerHTML += opt;
   });
+  dFilter.value = vehicles.includes(oldVal) || oldVal === 'all' ? oldVal : 'none';
+  const tSel = document.getElementById('typeSelect');
+  tSel.innerHTML = '';
+  Object.keys(intervals).forEach(k => { tSel.innerHTML += `<option value="${k}">${k}</option>`; });
 }
 
-function refreshTable() {
-  tbody.innerHTML = '';
-  const selectedVehicle = vehicleSelect.value;
-  if (!selectedVehicle || selectedVehicle === 'Fahrzeug auswählen') return;
-
-  const filteredData = data.filter(entry => entry.vehicle === selectedVehicle);
-  filteredData.forEach((entry, index) => {
-    const tr = document.createElement('tr');
-    const status = getStatus(entry);
-    tr.innerHTML = `
-      <td>${entry.vehicle}</td>
-      <td>${entry.date}</td>
-      <td>${entry.type}</td>
-      <td class="${status.class}">${status.symbol}</td>
-      <td><input type="checkbox" onchange="completeEntry(${data.indexOf(entry)})" ${entry.completed ? 'checked' : ''}></td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-function getStatus(entry) {
-  const today = new Date();
-  const entryDate = new Date(entry.date);
-  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const entryMidnight = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate());
-
-  if (entry.completed) return { symbol: '✅', class: 'status-ok' };
-  if (entryMidnight < todayMidnight) return { symbol: '❌', class: 'status-overdue' };
-  if ((entryMidnight - todayMidnight) / (1000 * 60 * 60 * 24) < 30) return { symbol: '⚠️', class: 'status-warning' };
-  return { symbol: '✅', class: 'status-ok' };
-}
-
-function completeEntry(index) {
-  let entry = data[index];
-  const interval = {
-    'TÜV': 365,
-    'Eichamt': 730,
-    'Prüfung Liege': 730,
-    'Prüfung elektr. Rampe': 365
-  };
-  const nextDate = new Date(entry.date);
-  nextDate.setDate(nextDate.getDate() + interval[entry.type]);
-  entry.date = nextDate.toISOString().split('T')[0];
-  entry.completed = true;
-  saveAll();
-  refreshTable();
+function checkVehicleConflict() {
+  const v = document.getElementById('vehicleSelect').value;
+  if (v && data.some(d => d.vehicle === v)) {
+    if (!confirm(`Fahrzeug ${v} ist bereits in Liste. Neuen Termin hinzufügen?`)) document.getElementById('vehicleSelect').value = "";
+  }
 }
 
 function addVehicle() {
-  const val = newVehicleInput.value.trim();
-  if (val && !vehicles.includes(val)) {
-    vehicles.push(val);
-    saveAll();
-    refreshVehicleSelect();
-    newVehicleInput.value = '';
-  }
-}
-
-function editVehicle() {
-  const current = vehicleSelect.value;
-  if (!current || current === 'Fahrzeug auswählen') return;
-  const updated = prompt("Neues Kennzeichen für " + current + ":", current);
-  if (updated && updated !== current) {
-    vehicles = vehicles.map(v => v === current ? updated : v);
-    data = data.map(d => d.vehicle === current ? { ...d, vehicle: updated } : d);
-    saveAll();
-    refreshVehicleSelect();
-    refreshTable();
-  }
-}
-
-function deleteVehicle() {
-  const current = vehicleSelect.value;
-  if (!current || current === 'Fahrzeug auswählen') return;
-  if (confirm(`${current} löschen?`)) {
-    vehicles = vehicles.filter(v => v !== current);
-    data = data.filter(d => d.vehicle !== current);
-    saveAll();
-    refreshVehicleSelect();
-    refreshTable();
+  const v = document.getElementById('newVehicle').value.trim();
+  if(v && !vehicles.includes(v)) {
+    vehicles.push(v); saveAll(); refreshVehicleSelect();
+    document.getElementById('newVehicle').value = '';
+    document.getElementById('vehicleSelect').value = v;
   }
 }
 
 function addEntry() {
-  const vehicle = vehicleSelect.value;
-  const date = dateInput.value;
-  const type = typeSelect.value;
-  if (!vehicle || vehicle === 'Fahrzeug auswählen' || !date || !type) return;
-  data.push({ vehicle, date, type, completed: false });
+  const v = document.getElementById('vehicleSelect').value;
+  const d = document.getElementById('dateInput').value;
+  if(!v || !d) return alert("Fahrzeug/Datum fehlen!");
+  data.push({ id: Date.now(), vehicle: v, date: d, type: document.getElementById('typeSelect').value, km: document.getElementById('kmInput').value });
   saveAll();
+  document.getElementById('dateInput').value = '';
+  document.getElementById('kmInput').value = '';
+  document.getElementById('vehicleSelect').value = "";
   refreshTable();
-  dateInput.value = '';
-  typeSelect.selectedIndex = 0;
-  checkNotifications();
 }
 
-// ✅ NEUE generatePDF-Funktion
+function refreshTable() {
+  const display = document.getElementById('vehicleDisplayList');
+  const filterVal = document.getElementById('displayFilter').value;
+  display.innerHTML = '';
+  if (filterVal === 'none') { display.innerHTML = '<div class="empty-state">Bitte Fahrzeug auswählen.</div>'; return; }
+  const activeVehicles = (filterVal === 'all') ? [...new Set(data.map(d => d.vehicle))].sort() : [filterVal];
+  activeVehicles.forEach(vName => {
+    const vEntries = data.filter(d => d.vehicle === vName);
+    if (vEntries.length === 0) return;
+    let maxU = 0; let rows = '';
+    vEntries.sort((a,b) => new Date(a.date) - new Date(b.date)).forEach(e => {
+      const diff = Math.ceil((new Date(e.date) - new Date().setHours(0,0,0,0)) / 86400000);
+      let c = 'status-ok', t = '📅 OK';
+      if(diff < 0) { c = 'status-overdue'; t = '❌ FÄLLIG'; maxU = 2; }
+      else if(diff <= 14) { c = 'status-warning'; t = '⚠️ BALD'; if(maxU < 2) maxU = 1; }
+      rows += `<div class="term-row"><div><strong>${e.type}</strong></div><div onclick="edit(${e.id},'date',this)">${new Date(e.date).toLocaleDateString()}</div><div>${e.km || '-'}</div><div class="${c}">${t}</div><div style="text-align:right;"><button onclick="completeEntry(${e.id})" style="width:auto; background:var(--success); padding:2px 8px;">✅</button></div></div>`;
+    });
+    const hC = (maxU === 2) ? 'header-overdue' : (maxU === 1 ? 'header-warning' : '');
+    const div = document.createElement('div'); div.className = 'vehicle-container';
+    div.innerHTML = `<div class="vehicle-header ${hC}"><span>🚗 <strong>${vName}</strong></span></div>${rows}`;
+    display.appendChild(div);
+  });
+}
+
+function completeEntry(id) {
+  const idx = data.findIndex(d => d.id === id);
+  const old = data[idx];
+  archive.push({ ...old, completedDate: new Date().toISOString().split('T')[0] });
+  const next = new Date(old.date);
+  next.setDate(next.getDate() + (intervals[old.type] || 365));
+  old.date = next.toISOString().split('T')[0];
+  old.km = ''; saveAll(); refreshTable();
+}
+
+function exportData() {
+  const b = { data, vehicles, archive, intervals };
+  const blob = new Blob([JSON.stringify(b, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `fuhrpark_v74_${new Date().toISOString().split('T')[0]}.json`; a.click();
+}
+
+function importData() {
+  const file = document.getElementById('importFile').files[0];
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const j = JSON.parse(e.target.result);
+    if(confirm("Daten überschreiben?")) {
+      data = j.data; vehicles = j.vehicles; archive = j.archive || []; intervals = j.intervals || intervals;
+      saveAll(); location.reload();
+    }
+  };
+  reader.readAsText(file);
+}
+
+function renderIntervalSettings() {
+  const div = document.getElementById('intervalSettings');
+  div.innerHTML = '';
+  Object.keys(intervals).forEach(k => {
+    div.innerHTML += `<div><label>${k}</label><input type="number" value="${intervals[k]}" data-key="${k}" class="int-v"></div>`;
+  });
+}
+
+function saveIntervals() {
+  document.querySelectorAll('.int-v').forEach(i => intervals[i.dataset.key] = parseInt(i.value));
+  saveAll(); alert("Gespeichert!");
+}
+
+function refreshArchive() {
+  const b = document.getElementById('archiveBody'); b.innerHTML = '';
+  archive.slice().reverse().forEach(e => {
+    b.innerHTML += `<tr style="border-bottom: 1px solid var(--border);"><td style="padding:8px;">${e.completedDate}</td><td>${e.vehicle}</td><td>${e.type}</td><td>${e.km || '-'}</td></tr>`;
+  });
+}
+
 function generatePDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
-  const today = new Date().toLocaleDateString('de-DE');
-
-  doc.text("Prüftermine Übersicht", 14, 15);
-  doc.text(`Erstellt am: ${today}`, 180, 15, { align: 'right' });
-
-  const sortedData = [...data].sort((a, b) => a.vehicle.localeCompare(b.vehicle));
-  const grouped = {};
-  sortedData.forEach(entry => {
-    if (!grouped[entry.vehicle]) grouped[entry.vehicle] = [];
-    grouped[entry.vehicle].push(entry);
-  });
-
-  let currentY = 25;
-
-  for (const vehicle in grouped) {
-    doc.setFontSize(12);
-    doc.setTextColor(40);
-    doc.text(`Fahrzeug: ${vehicle}`, 14, currentY);
-    currentY += 6;
-
-    const rows = grouped[vehicle].map(entry => [
-      entry.date,
-      entry.type,
-      getStatus(entry).symbol
-    ]);
-
-    doc.autoTable({
-      head: [["Datum", "Prüfart", "Status"]],
-      body: rows,
-      startY: currentY,
-      theme: 'striped',
-      styles: { fontSize: 10 },
-      margin: { left: 14, right: 14 },
-      didDrawPage: function (data) {
-        currentY = data.cursor.y + 10;
-      }
-    });
-  }
-
-  doc.save("prueftermine_alle_fahrzeuge.pdf");
+  doc.text("Fuhrpark Prüfplan - Statusbericht", 14, 15);
+  const rows = data.map(e => [e.vehicle, e.type, e.date, e.km || '-']);
+  doc.autoTable({ head: [['Fahrzeug', 'Prüfung', 'Fällig am', 'KM']], body: rows, startY: 20 });
+  doc.save("Pruefplan.pdf");
 }
 
-function checkNotifications() {
-  if (Notification.permission !== "granted") {
-    Notification.requestPermission();
-  }
-
-  const now = new Date();
-  data.forEach(entry => {
-    const daysUntilDue = (new Date(entry.date) - now) / (1000 * 60 * 60 * 24);
-    if (!entry.completed && daysUntilDue > 0 && daysUntilDue <= 7) {
-      new Notification(`📅 Bald fällig: ${entry.type} für ${entry.vehicle} am ${entry.date}`);
-    }
-  });
-}
-
+updateNotifVisuals();
 refreshVehicleSelect();
 refreshTable();
-checkNotifications();
 </script>
 </body>
 </html>
